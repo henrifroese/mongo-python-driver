@@ -421,7 +421,7 @@ class GridIn(object):
         return False
 
 
-class GridOut(object):
+class GridOut(io.IOBase):
     """Class to read data out of GridFS.
     """
     def __init__(self, root_collection, file_id=None, file_document=None,
@@ -611,6 +611,30 @@ class GridOut(object):
         data.seek(0)
         return data.read(size)
 
+    def readlines(self, hint=-1):
+        """Read and return a list of lines from the file.
+
+        :Parameters:
+         - `hint` (optional): Stop reading lines after more than `hint`
+            bytes have been read. If `hint` <= 0, read all lines.
+        """
+        lines = []
+
+        if hint <= 0:
+            line = self.readline()
+            while line != EMPTY:
+                lines.append(line)
+                line = self.readline()
+
+        else:
+            received = 0
+            line = self.readline()
+            while line != EMPTY and received <= hint:
+                lines.append(line)
+                line = self.readline()
+
+        return lines
+
     def tell(self):
         """Return the current position of this file.
         """
@@ -680,8 +704,18 @@ class GridOut(object):
             self.__chunk_iter.close()
             self.__chunk_iter = None
 
+    @property
+    def closed(self):
+        return self.__chunk_iter is None
+
     def write(self, value):
         raise io.UnsupportedOperation('write')
+
+    def writelines(self, lines):
+        raise io.UnsupportedOperation('writelines')
+
+    def writable(self):
+        return False
 
     def __enter__(self):
         """Makes it possible to use :class:`GridOut` files
@@ -695,6 +729,21 @@ class GridOut(object):
         """
         self.close()
         return False
+
+    def fileno(self):
+        raise io.UnsupportedOperation('fileno')
+
+    def flush(self):
+        # GridOut is read-only, so flush does nothing.
+        pass
+
+    def isatty(self):
+        return False
+
+    def truncate(self, size=None):
+        # See https://docs.python.org/3/library/io.html#io.IOBase.writable
+        # for why truncate has to raise.
+        raise io.UnsupportedOperation('truncate')
 
 
 class _GridOutChunkIterator(object):
